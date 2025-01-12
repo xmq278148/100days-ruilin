@@ -132,10 +132,16 @@ messagesDiv.parentNode.insertBefore(paginationDiv, messagesDiv.nextSibling);
 const messagesPerPage = 5;
 let currentPage = 1;
 
-// 从 localStorage 加载留言
+// 从服务器加载留言
 document.addEventListener('DOMContentLoaded', () => {
-    const storedMessages = JSON.parse(localStorage.getItem('messages')) || [];
-    renderMessages(storedMessages, currentPage);
+    fetch('http://localhost:5000/api/messages')
+        .then(response => response.json())
+        .then(messages => {
+            renderMessages(messages, currentPage);
+        })
+        .catch(error => {
+            console.error('加载留言失败:', error);
+        });
 });
 
 messageForm.addEventListener('submit', (e) => {
@@ -143,22 +149,34 @@ messageForm.addEventListener('submit', (e) => {
     const name = messageForm.querySelector('input').value;
     const content = messageForm.querySelector('textarea').value;
     
-    const messageId = Date.now().toString();
-    
     const message = {
-        id: messageId,
+        id: Date.now().toString(),
         author: name,
         content: content,
         timestamp: new Date().toLocaleString()
     };
     
-    // 保存留言到 localStorage
-    const storedMessages = JSON.parse(localStorage.getItem('messages')) || [];
-    storedMessages.push(message);
-    localStorage.setItem('messages', JSON.stringify(storedMessages));
-    
-    renderMessages(storedMessages, currentPage);
-    messageForm.reset();
+    // 发送留言到服务器
+    fetch('http://localhost:5000/api/messages', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message)
+    })
+    .then(response => response.json())
+    .then(() => {
+        // 重新加载所有留言
+        return fetch('http://localhost:5000/api/messages');
+    })
+    .then(response => response.json())
+    .then(messages => {
+        renderMessages(messages, currentPage);
+        messageForm.reset();
+    })
+    .catch(error => {
+        console.error('发送留言失败:', error);
+    });
 });
 
 // 渲染留言和分页
@@ -183,7 +201,11 @@ function renderPagination(totalMessages, page) {
     prevButton.addEventListener('click', () => {
         if (currentPage > 1) {
             currentPage--;
-            renderMessages(JSON.parse(localStorage.getItem('messages')) || [], currentPage);
+            fetch('http://localhost:5000/api/messages')
+                .then(response => response.json())
+                .then(messages => {
+                    renderMessages(messages, currentPage);
+                });
         }
     });
     paginationDiv.appendChild(prevButton);
@@ -194,7 +216,11 @@ function renderPagination(totalMessages, page) {
         pageButton.className = i === page ? 'active' : '';
         pageButton.addEventListener('click', () => {
             currentPage = i;
-            renderMessages(JSON.parse(localStorage.getItem('messages')) || [], currentPage);
+            fetch('http://localhost:5000/api/messages')
+                .then(response => response.json())
+                .then(messages => {
+                    renderMessages(messages, currentPage);
+                });
         });
         paginationDiv.appendChild(pageButton);
     }
@@ -206,7 +232,11 @@ function renderPagination(totalMessages, page) {
     nextButton.addEventListener('click', () => {
         if (currentPage < totalPages) {
             currentPage++;
-            renderMessages(JSON.parse(localStorage.getItem('messages')) || [], currentPage);
+            fetch('http://localhost:5000/api/messages')
+                .then(response => response.json())
+                .then(messages => {
+                    renderMessages(messages, currentPage);
+                });
         }
     });
     paginationDiv.appendChild(nextButton);
@@ -336,4 +366,21 @@ document.getElementById('adminLoginBtn').addEventListener('click', () => {
     modal.style.top = '50%';
     modal.style.left = '50%';
     modal.style.transform = 'translate(-50%, -50%)';
-}); 
+});
+
+// 删除留言
+function deleteMessage(messageEl, messageId) {
+    fetch(`http://localhost:5000/api/messages/${messageId}`, {
+        method: 'DELETE'
+    })
+    .then(() => {
+        messageEl.style.opacity = '0';
+        messageEl.style.transform = 'translateY(-20px)';
+        setTimeout(() => {
+            messagesDiv.removeChild(messageEl);
+        }, 300);
+    })
+    .catch(error => {
+        console.error('删除留言失败:', error);
+    });
+} 
