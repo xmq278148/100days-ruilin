@@ -122,166 +122,6 @@ musicToggle.addEventListener('click', (e) => {
     isPlaying = !isPlaying;
 });
 
-// 留言功能
-const messageForm = document.getElementById('messageForm');
-const messagesDiv = document.querySelector('.messages');
-const paginationDiv = document.createElement('div');
-paginationDiv.className = 'pagination';
-messagesDiv.parentNode.insertBefore(paginationDiv, messagesDiv.nextSibling);
-
-const messagesPerPage = 5;
-let currentPage = 1;
-
-// 从服务器加载留言
-document.addEventListener('DOMContentLoaded', () => {
-    fetch('http://localhost:5000/api/messages')
-        .then(response => response.json())
-        .then(messages => {
-            renderMessages(messages, currentPage);
-        })
-        .catch(error => {
-            console.error('加载留言失败:', error);
-        });
-});
-
-messageForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const name = messageForm.querySelector('input').value;
-    const content = messageForm.querySelector('textarea').value;
-    
-    const message = {
-        id: Date.now().toString(),
-        author: name,
-        content: content,
-        timestamp: new Date().toLocaleString()
-    };
-    
-    // 发送留言到服务器
-    fetch('http://localhost:5000/api/messages', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(message)
-    })
-    .then(response => response.json())
-    .then(() => {
-        // 重新加载所有留言
-        return fetch('http://localhost:5000/api/messages');
-    })
-    .then(response => response.json())
-    .then(messages => {
-        renderMessages(messages, currentPage);
-        messageForm.reset();
-    })
-    .catch(error => {
-        console.error('发送留言失败:', error);
-    });
-});
-
-// 渲染留言和分页
-function renderMessages(messages, page) {
-    messagesDiv.innerHTML = '';
-    const start = (page - 1) * messagesPerPage;
-    const end = start + messagesPerPage;
-    const paginatedMessages = messages.slice(start, end);
-    paginatedMessages.forEach(message => addMessageToDOM(message));
-    renderPagination(messages.length, page);
-}
-
-// 渲染分页按钮
-function renderPagination(totalMessages, page) {
-    paginationDiv.innerHTML = '';
-    const totalPages = Math.ceil(totalMessages / messagesPerPage);
-    
-    // 添加左箭头
-    const prevButton = document.createElement('button');
-    prevButton.textContent = '◀';
-    prevButton.disabled = page === 1;
-    prevButton.addEventListener('click', () => {
-        if (currentPage > 1) {
-            currentPage--;
-            fetch('http://localhost:5000/api/messages')
-                .then(response => response.json())
-                .then(messages => {
-                    renderMessages(messages, currentPage);
-                });
-        }
-    });
-    paginationDiv.appendChild(prevButton);
-
-    for (let i = 1; i <= totalPages; i++) {
-        const pageButton = document.createElement('button');
-        pageButton.textContent = i;
-        pageButton.className = i === page ? 'active' : '';
-        pageButton.addEventListener('click', () => {
-            currentPage = i;
-            fetch('http://localhost:5000/api/messages')
-                .then(response => response.json())
-                .then(messages => {
-                    renderMessages(messages, currentPage);
-                });
-        });
-        paginationDiv.appendChild(pageButton);
-    }
-    
-    // 添加右箭头
-    const nextButton = document.createElement('button');
-    nextButton.textContent = '▶';
-    nextButton.disabled = page === totalPages;
-    nextButton.addEventListener('click', () => {
-        if (currentPage < totalPages) {
-            currentPage++;
-            fetch('http://localhost:5000/api/messages')
-                .then(response => response.json())
-                .then(messages => {
-                    renderMessages(messages, currentPage);
-                });
-        }
-    });
-    paginationDiv.appendChild(nextButton);
-}
-
-// 将留言添加到 DOM
-function addMessageToDOM(message) {
-    const messageEl = document.createElement('div');
-    messageEl.className = 'message';
-    messageEl.dataset.id = message.id;
-    messageEl.dataset.author = message.author;
-    messageEl.innerHTML = `
-        <strong>${message.author}</strong>
-        <p>${message.content}</p>
-        <small>${message.timestamp}</small>
-        <button class="delete-btn" title="删除">🗑️</button>
-    `;
-    
-    // 添加删除按钮的事件监听
-    const deleteBtn = messageEl.querySelector('.delete-btn');
-    deleteBtn.addEventListener('click', () => {
-        if (confirm('确定要删除这条留言吗？')) {
-            messageEl.style.opacity = '0';
-            messageEl.style.transform = 'translateY(-20px)';
-            setTimeout(() => {
-                messagesDiv.removeChild(messageEl);
-                // 从 localStorage 中删除留言
-                const storedMessages = JSON.parse(localStorage.getItem('messages')) || [];
-                const updatedMessages = storedMessages.filter(m => m.id !== message.id);
-                localStorage.setItem('messages', JSON.stringify(updatedMessages));
-            }, 300);
-        }
-    });
-    
-    messagesDiv.insertBefore(messageEl, messagesDiv.firstChild);
-    
-    // 添加出现动画
-    messageEl.style.opacity = '0';
-    messageEl.style.transform = 'translateY(-20px)';
-    setTimeout(() => {
-        messageEl.style.opacity = '1';
-        messageEl.style.transform = 'translateY(0)';
-    }, 10);
-}
-
 // 添加右键菜单功能
 document.addEventListener('contextmenu', function(e) {
     const messageEl = e.target.closest('.message');
@@ -370,17 +210,16 @@ document.getElementById('adminLoginBtn').addEventListener('click', () => {
 
 // 删除留言
 function deleteMessage(messageEl, messageId) {
-    fetch(`http://localhost:5000/api/messages/${messageId}`, {
-        method: 'DELETE'
-    })
-    .then(() => {
+    try {
+        const storedMessages = JSON.parse(localStorage.getItem('messages')) || [];
+        const updatedMessages = storedMessages.filter(m => m.id !== messageId);
+        localStorage.setItem('messages', JSON.stringify(updatedMessages));
         messageEl.style.opacity = '0';
         messageEl.style.transform = 'translateY(-20px)';
         setTimeout(() => {
             messagesDiv.removeChild(messageEl);
         }, 300);
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('删除留言失败:', error);
-    });
+    }
 } 
