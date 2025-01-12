@@ -1,38 +1,51 @@
-import os
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import json
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-from pathlib import Path
+import os
 
-class PhotoHandler(SimpleHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == '/get_photos':
-            # 获取百天照文件夹中的照片
-            photo_dir = Path(r'C:\熊的文件\百天照')
-            photos = []
-            
-            # 获取所有jpg和png文件
-            for file in photo_dir.glob('*.[jJ][pP][gG]'):
-                photos.append({
-                    'url': f'./百天照/{file.name}',
-                    'title': f'熊睿霖百天照 - {file.stem}'
-                })
-            
-            # 按文件名排序
-            photos.sort(key=lambda x: x['url'])
-            
-            # 只取前8张
-            photos = photos[:8]
-            
-            # 返回JSON数据
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps(photos).encode())
-            return
-            
-        return SimpleHTTPRequestHandler.do_GET(self)
+app = Flask(__name__)
+CORS(app)  # 允许跨域请求
 
-# 启动服务器
-httpd = HTTPServer(('localhost', 8000), PhotoHandler)
-print("服务器启动在 http://localhost:8000")
-httpd.serve_forever() 
+# 留言数据文件
+MESSAGES_FILE = 'messages.json'
+
+# 确保留言文件存在
+if not os.path.exists(MESSAGES_FILE):
+    with open(MESSAGES_FILE, 'w', encoding='utf-8') as f:
+        json.dump([], f)
+
+# 读取留言
+def read_messages():
+    with open(MESSAGES_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+# 写入留言
+def write_messages(messages):
+    with open(MESSAGES_FILE, 'w', encoding='utf-8') as f:
+        json.dump(messages, f, ensure_ascii=False)
+
+# 获取所有留言
+@app.route('/api/messages', methods=['GET'])
+def get_messages():
+    messages = read_messages()
+    return jsonify(messages)
+
+# 添加新留言
+@app.route('/api/messages', methods=['POST'])
+def add_message():
+    message = request.json
+    messages = read_messages()
+    messages.append(message)
+    write_messages(messages)
+    return jsonify(message)
+
+# 删除留言
+@app.route('/api/messages/<message_id>', methods=['DELETE'])
+def delete_message(message_id):
+    messages = read_messages()
+    messages = [m for m in messages if m['id'] != message_id]
+    write_messages(messages)
+    return jsonify({'success': True})
+
+if __name__ == '__main__':
+    app.run(port=5000) 
